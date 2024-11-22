@@ -207,3 +207,12 @@ func (s *Segments) Unshift(v Segment) {
 	s.values = append(s.values[0:1], s.values[0:]...)
 	s.values[0] = v
 }
+
+// Value returns a string value of the collection.
+func (s *Segments) Value(buffer []byte) []byte {
+	var result []byte
+	for _, v := range s.values {
+		result = append(result, v.Value(buffer)...)
+	}
+	return result
+}

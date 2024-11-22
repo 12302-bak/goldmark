@@ -4,7 +4,10 @@ package html
 import (
 	"bytes"
 	"fmt"
+	"github.com/yuin/goldmark/text"
+	"regexp"
 	"strconv"
+	"strings"
 	"unicode"
 	"unicode/utf8"
 
@@ -359,6 +362,20 @@ var BlockquoteAttributeFilter = GlobalAttributeFilter.Extend(
 
 func (r *Renderer) renderBlockquote(
 	w util.BufWriter, source []byte, n ast.Node, entering bool) (ast.WalkStatus, error) {
+	firstChild := n.FirstChild()
+	if firstChild != nil {
+		paragraph, ok := firstChild.(*ast.Paragraph)
+		if ok {
+			value := paragraph.Lines().Value(source)
+			remain := util.TrimLeftSpace(value)
+			if strings.HasPrefix(string(remain), "[?]") {
+				return ast.WalkContinue, nil
+			}
+			if strings.HasPrefix(string(remain), "[!]") {
+				return ast.WalkContinue, nil
+			}
+		}
+	}
 	if entering {
 		if n.Attributes() != nil {
 			_, _ = w.WriteString("<blockquote")
@@ -387,17 +404,17 @@ func (r *Renderer) renderFencedCodeBlock(
 	w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
 	n := node.(*ast.FencedCodeBlock)
 	if entering {
-		_, _ = w.WriteString("<pre><code")
 		language := n.Language(source)
-		if language != nil {
-			_, _ = w.WriteString(" class=\"language-")
-			r.Writer.Write(w, language)
-			_, _ = w.WriteString("\"")
+		if language == nil {
+			language = []byte("markup")
 		}
-		_ = w.WriteByte('>')
+		languageStr := string(language)
+		windowsStyle := `<div class="outer yosemite"><div class="dot red"></div><div class="dot amber"></div><div class="dot green"></div></div>`
+		replace := `<div class="code-toolbar"><pre data-lang="` + languageStr + `" class="language-` + languageStr + ` line-numbers"><code class="language-` + languageStr + `">`
+		_, _ = w.WriteString(windowsStyle + "\n" + replace)
 		r.writeLines(w, source, n)
 	} else {
-		_, _ = w.WriteString("</code></pre>\n")
+		_, _ = w.WriteString("</code></pre></div>\n")
 	}
 	return ast.WalkContinue, nil
 }
@@ -488,6 +505,8 @@ func (r *Renderer) renderListItem(w util.BufWriter, source []byte, n ast.Node, e
 // ParagraphAttributeFilter defines attribute names which paragraph elements can have.
 var ParagraphAttributeFilter = GlobalAttributeFilter
 
+var docsifyStylePrag = regexp.MustCompile(`^((!>|\?>|\[\?\]|\[!\])\s*)`)
+
 func (r *Renderer) renderParagraph(w util.BufWriter, source []byte, n ast.Node, entering bool) (ast.WalkStatus, error) {
 	if entering {
 		if n.Attributes() != nil {
@@ -495,6 +514,70 @@ func (r *Renderer) renderParagraph(w util.BufWriter, source []byte, n ast.Node, 
 			RenderAttributes(w, n, ParagraphAttributeFilter)
 			_ = w.WriteByte('>')
 		} else {
+			value := string(n.Lines().Value(source))
+			if value != "" {
+				subMatch := docsifyStylePrag.FindStringSubmatch(value)
+				if subMatch != nil && (subMatch[2] == "!>") {
+					_, _ = w.WriteString("<p class=\"tip\">")
+					return ast.WalkContinue, nil
+				}
+				if subMatch != nil && (subMatch[2] == "?>") {
+					_, _ = w.WriteString("<p class=\"warn\">")
+					return ast.WalkContinue, nil
+				}
+
+				if subMatch != nil && (subMatch[2] == "[?]" || subMatch[2] == "[!]") {
+					firstText := n.FirstChild().(*ast.Text)
+					secondText := n.FirstChild().NextSibling().(*ast.Text)
+					third := n.FirstChild().NextSibling().NextSibling()
+					temp := secondText.Segment.Value(source)
+					if len(temp) == 1 {
+						secondText.Segment = text.NewSegment(0, 0)
+						firstText.Segment = text.NewSegment(0, 0)
+						thirdText, ok := third.(*ast.Text)
+						if ok {
+							continueTemp := thirdText.Segment.Value(source)
+							length := util.TrimLeftSpaceLength(continueTemp[1:])
+							thirdText.Segment = text.NewSegment(thirdText.Segment.Start+length+1, thirdText.Segment.Stop)
+						}
+					} else {
+						length := util.TrimLeftSpaceLength(temp[2:])
+						secondText.Segment = text.NewSegment(secondText.Segment.Start+length+2, secondText.Segment.Stop)
+						firstText.Segment = text.NewSegment(0, 0)
+					}
+
+					if subMatch[2] == "[?]" {
+						_, _ = w.WriteString("<p class=\"warn\">")
+					} else {
+						_, _ = w.WriteString("<p class=\"tip\">")
+					}
+					return ast.WalkContinue, nil
+				}
+
+				// handle image `align=center`, not contain other type
+				findCenter := false
+				firstC := n.FirstChild()
+				for {
+					image, ok := firstC.(*ast.Image)
+					if ok {
+						if strings.Contains(string(image.Title), ":align=center") {
+							findCenter = true
+						}
+						firstC = image.NextSibling()
+						if firstC == nil && findCenter {
+							_, _ = w.WriteString("<p style=\"text-align: center;\">")
+							return ast.WalkContinue, nil
+						}
+					} else {
+						tmpText, ok2 := firstC.(*ast.Text)
+						if ok2 && tmpText.Segment.Start == tmpText.Segment.Stop {
+							firstC = tmpText.NextSibling()
+							continue
+						}
+						break
+					}
+				}
+			}
 			_, _ = w.WriteString("<p>")
 		}
 	} else {
@@ -670,6 +753,8 @@ var ImageAttributeFilter = GlobalAttributeFilter.Extend(
 	[]byte("width"),
 )
 
+var docsifyStyleImg = regexp.MustCompile(`(?:^|\s)((:([\w-]+:?)=?([\w-%]+)?)|([\w\s]+\w))`)
+
 func (r *Renderer) renderImage(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
 	if !entering {
 		return ast.WalkContinue, nil
@@ -682,10 +767,27 @@ func (r *Renderer) renderImage(w util.BufWriter, source []byte, node ast.Node, e
 	_, _ = w.WriteString(`" alt="`)
 	r.renderAttribute(w, source, n)
 	_ = w.WriteByte('"')
+
 	if n.Title != nil {
-		_, _ = w.WriteString(` title="`)
-		r.Writer.Write(w, n.Title)
-		_ = w.WriteByte('"')
+		match := docsifyStyleImg.FindAllStringSubmatch(string(n.Title), -1)
+		size := ""
+		title := ""
+		if match != nil {
+			for i := 0; i < len(match); i++ {
+				i2 := match[i]
+				if strings.HasPrefix(i2[1], ":size") {
+					split := strings.Split(i2[4], "x")
+					size = " width=\"" + split[0] + "\""
+					if len(split) > 1 && split[1] != "" {
+						size = size + " height=\"" + split[1] + "\""
+					}
+				}
+				if !strings.HasPrefix(i2[1], ":") {
+					title = " title=\"" + i2[1] + "\""
+				}
+			}
+		}
+		_, _ = w.WriteString(size + title)
 	}
 	if n.Attributes() != nil {
 		RenderAttributes(w, n, ImageAttributeFilter)
@@ -726,6 +828,14 @@ func (r *Renderer) renderText(w util.BufWriter, source []byte, node ast.Node, en
 		r.Writer.RawWrite(w, segment.Value(source))
 	} else {
 		value := segment.Value(source)
+		valueStr := string(value)
+		if strings.HasPrefix(valueStr, "?>") ||
+			strings.HasPrefix(valueStr, "!>") {
+			value = util.TrimLeftSpace([]byte(valueStr[2:]))
+			r.Writer.Write(w, value)
+			return ast.WalkContinue, nil
+		}
+
 		r.Writer.Write(w, value)
 		if n.HardLineBreak() || (n.SoftLineBreak() && r.HardWraps) {
 			if r.XHTML {

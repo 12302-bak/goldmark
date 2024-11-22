@@ -233,7 +233,7 @@ func (b *tableParagraphTransformer) parseRow(segment text.Segment,
 				}
 			}
 		}
-		seg := text.NewSegment(segment.Start+pos, segment.Start+closure)
+		seg := text.NewSegment(segment.Start+pos-segment.Padding, segment.Start+closure-segment.Padding)
 		seg = seg.TrimLeftSpace(source)
 		seg = seg.TrimRightSpace(source)
 		node.Lines().Append(seg)
