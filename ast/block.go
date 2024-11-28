@@ -263,6 +263,8 @@ type FencedCodeBlock struct {
 	Info *Text
 
 	language []byte
+
+	lineHighlight []byte
 }
 
 // Language returns an language in an info string.
@@ -280,6 +282,29 @@ func (n *FencedCodeBlock) Language(source []byte) []byte {
 		n.language = info[:i]
 	}
 	return n.language
+}
+
+// LineHighlight returns nil if this node does not have an info string.
+func (n *FencedCodeBlock) LineHighlight(source []byte) []byte {
+	if n.lineHighlight == nil && n.Info != nil {
+		segment := n.Info.Segment
+		info := segment.Value(source)
+		i := 0
+		start := 0
+		end := 0
+		for ; i < len(info); i++ {
+			if info[i] == '{' {
+				start = i
+			}
+			if info[i] == '}' {
+				end = i
+			}
+		}
+		if end > start {
+			n.lineHighlight = info[start+1 : end]
+		}
+	}
+	return n.lineHighlight
 }
 
 // IsRaw implements Node.IsRaw.

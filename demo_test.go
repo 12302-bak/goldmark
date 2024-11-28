@@ -41,7 +41,7 @@ func TestDemo(t *testing.T) {
 		),
 	)
 
-	source, err := os.ReadFile("/Users/stevenobelia/Desktop/_scratch/clean/archive-docsify/README.md")
+	source, err := os.ReadFile("/Users/stevenobelia/Desktop/archive/archive-docsify/README.md")
 	if err != nil {
 		panic(err)
 	}
@@ -52,7 +52,7 @@ func TestDemo(t *testing.T) {
 	}
 	h := buf.String()
 	fmt.Printf("\n%s\n", h)
-	writeErr := os.WriteFile("/Users/stevenobelia/Desktop/_scratch/clean/archive-docsify/.a_test/README.html", buf.Bytes(), 0644)
+	writeErr := os.WriteFile("/Users/stevenobelia/Desktop/archive/archive-docsify/README.html", buf.Bytes(), 0644)
 	if writeErr != nil {
 		panic(writeErr)
 	}
