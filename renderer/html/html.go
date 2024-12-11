@@ -297,6 +297,14 @@ func (r *Renderer) writeLines(w util.BufWriter, source []byte, n ast.Node) {
 	}
 }
 
+func (r *Renderer) writeLinesWithMarkTag(w util.BufWriter, source []byte, n ast.Node) {
+	l := n.Lines().Len()
+	for i := 0; i < l; i++ {
+		line := n.Lines().At(i)
+		r.Writer.RawWriteWithMarkTag(w, line.Value(source))
+	}
+}
+
 // GlobalAttributeFilter defines attribute names which any elements can have.
 var GlobalAttributeFilter = util.NewBytesFilter(
 	[]byte("accesskey"),
@@ -418,7 +426,7 @@ func (r *Renderer) renderFencedCodeBlock(
 		replace := `<div class="code-toolbar"><pre data-lang="` + languageStr + `" data-line="` + lineHighlightStr + `" class="language-` + languageStr +
 			` line-numbers"><code class="language-` + languageStr + `">`
 		_, _ = w.WriteString(windowsStyle + "\n" + replace)
-		r.writeLines(w, source, n)
+		r.writeLinesWithMarkTag(w, source, n)
 	} else {
 		_, _ = w.WriteString("</code></pre></div>\n")
 	}
@@ -941,6 +949,9 @@ type Writer interface {
 	// unescaping backslash escaped characters.
 	RawWrite(writer util.BufWriter, source []byte)
 
+	// RawWriteWithMarkTag writes the given source escape <mark></mark>
+	RawWriteWithMarkTag(writer util.BufWriter, source []byte)
+
 	// SecureWrite writes the given source to writer with replacing insecure characters.
 	SecureWrite(writer util.BufWriter, source []byte)
 }
@@ -1020,6 +1031,56 @@ func (d *defaultWriter) RawWrite(writer util.BufWriter, source []byte) {
 	if n != 0 {
 		_, _ = writer.Write(source[l-n:])
 	}
+}
+
+func (d *defaultWriter) RawWriteWithMarkTag(writer util.BufWriter, source []byte) {
+	n := 0
+	l := len(source)
+	for i := 0; i < l; i++ {
+		v := util.EscapeHTMLByte(source[i])
+		if v != nil {
+			if string(v) == "&lt;" {
+				if i+4 < l && string(source[i:i+5]) == "<mark" {
+					bracket := findClosingBracket(source, i+4)
+					n += bracket - i
+					i = bracket
+					continue
+				}
+				if i+6 < l && string(source[i:i+7]) == "</mark>" {
+					n += 7
+					i += 6
+					continue
+				}
+			}
+			_, _ = writer.Write(source[i-n : i])
+			n = 0
+			_, _ = writer.Write(v)
+			continue
+		}
+		n++
+	}
+	if n != 0 {
+		_, _ = writer.Write(source[l-n:])
+	}
+}
+
+// findClosingBracket finds the index of the first occurrence of '>' starting from index i.
+// If not found, it returns -1.
+func findClosingBracket(s []byte, i int) int {
+	// Ensure i is within bounds and points to a '<'.
+	if i < 0 || i >= len(s) {
+		return -1
+	}
+
+	// Start searching from the character after '<'.
+	for j := i + 1; j < len(s); j++ {
+		if s[j] == '>' {
+			return j
+		}
+	}
+
+	// Return -1 if '>' is not found.
+	return -1
 }
 
 func (d *defaultWriter) Write(writer util.BufWriter, source []byte) {
