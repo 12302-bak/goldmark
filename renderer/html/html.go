@@ -1039,10 +1039,10 @@ func (d *defaultWriter) RawWriteWithMarkTag(writer util.BufWriter, source []byte
 	for i := 0; i < l; i++ {
 		v := util.EscapeHTMLByte(source[i])
 		if v != nil {
-			if string(v) == "&lt;" {
+			if string(source[i]) == "<" {
 				if i+4 < l && string(source[i:i+5]) == "<mark" {
 					bracket := findClosingBracket(source, i+4)
-					n += bracket - i
+					n += bracket - i + 1
 					i = bracket
 					continue
 				}

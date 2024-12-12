@@ -41,7 +41,7 @@ func TestDemo(t *testing.T) {
 		),
 	)
 
-	source, err := os.ReadFile("/Users/stevenobelia/Desktop/archive/archive-docsify/README.md")
+	source, err := os.ReadFile("/Users/stevenobelia/Desktop/archive/archive-hugo/content/devops/network/tls-ssl.md")
 	if err != nil {
 		panic(err)
 	}
@@ -52,10 +52,10 @@ func TestDemo(t *testing.T) {
 	}
 	h := buf.String()
 	fmt.Printf("\n%s\n", h)
-	writeErr := os.WriteFile("/Users/stevenobelia/Desktop/archive/archive-docsify/README.html", buf.Bytes(), 0644)
-	if writeErr != nil {
-		panic(writeErr)
-	}
+	//writeErr := os.WriteFile("/Users/stevenobelia/Desktop/archive/archive-docsify/README.html", buf.Bytes(), 0644)
+	//if writeErr != nil {
+	//	panic(writeErr)
+	//}
 	fmt.Println()
 }
 
