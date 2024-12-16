@@ -265,6 +265,8 @@ type FencedCodeBlock struct {
 	language []byte
 
 	lineHighlight []byte
+
+	preOtherAttrs []byte
 }
 
 // Language returns an language in an info string.
@@ -305,6 +307,50 @@ func (n *FencedCodeBlock) LineHighlight(source []byte) []byte {
 		}
 	}
 	return n.lineHighlight
+}
+
+// PreOtherAttrs returns nil if this node does not have an info string.
+func (n *FencedCodeBlock) PreOtherAttrs(source []byte) []byte {
+	if n.preOtherAttrs == nil && n.Info != nil {
+		segment := n.Info.Segment
+		info := segment.Value(source)
+		i := 0
+		start := 0
+		end := 0
+		for ; i < len(info); i++ {
+			if info[i] == '[' {
+				start = i
+			}
+			if info[i] == ']' {
+				end = i
+			}
+		}
+		if end > start {
+			n.preOtherAttrs = splitPreAttr(string(info[start+1 : end]))
+		}
+	}
+	return n.preOtherAttrs
+}
+
+func splitPreAttr(segment string) []byte {
+	pairs := strings.Split(segment, ",")
+
+	result := make(map[string]string)
+
+	for _, pair := range pairs {
+		if parts := strings.SplitN(pair, ":", 2); len(parts) == 2 {
+			key := strings.TrimSpace(parts[0])
+			value := strings.TrimSpace(parts[1])
+			result[key] = value
+		}
+	}
+
+	var output []string
+	for key, value := range result {
+		output = append(output, fmt.Sprintf(`%s="%s"`, key, value))
+	}
+
+	return []byte(strings.Join(output, " "))
 }
 
 // IsRaw implements Node.IsRaw.

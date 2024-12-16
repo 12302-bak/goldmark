@@ -414,16 +414,22 @@ func (r *Renderer) renderFencedCodeBlock(
 	if entering {
 		language := n.Language(source)
 		lineHighlight := n.LineHighlight(source)
+		preOtherAttrs := n.PreOtherAttrs(source)
 		if language == nil {
 			language = []byte("markup")
 		}
 		if lineHighlight == nil {
 			lineHighlight = []byte("")
 		}
+		if preOtherAttrs == nil {
+			preOtherAttrs = []byte("")
+		}
+
 		languageStr := string(language)
 		lineHighlightStr := string(lineHighlight)
+		preOtherAttrsStr := string(preOtherAttrs)
 		windowsStyle := `<div class="outer yosemite"><div class="dot red"></div><div class="dot amber"></div><div class="dot green"></div></div>`
-		replace := `<div class="code-toolbar"><pre data-lang="` + languageStr + `" data-line="` + lineHighlightStr + `" class="language-` + languageStr +
+		replace := `<div class="code-toolbar"><pre data-lang="` + languageStr + `" data-line="` + lineHighlightStr + `" ` + preOtherAttrsStr + ` class="language-` + languageStr +
 			` line-numbers"><code class="language-` + languageStr + `">`
 		_, _ = w.WriteString(windowsStyle + "\n" + replace)
 		r.writeLinesWithMarkTag(w, source, n)
