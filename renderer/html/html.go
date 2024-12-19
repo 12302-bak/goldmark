@@ -421,16 +421,21 @@ func (r *Renderer) renderFencedCodeBlock(
 		if lineHighlight == nil {
 			lineHighlight = []byte("")
 		}
-		if preOtherAttrs == nil {
-			preOtherAttrs = []byte("")
-		}
 
 		languageStr := string(language)
 		lineHighlightStr := string(lineHighlight)
-		preOtherAttrsStr := string(preOtherAttrs)
+		preOtherAttrsStr := ""
+		maxHeight := "none"
+		if &preOtherAttrs != nil {
+			preOtherAttrsStr = string(preOtherAttrs.AttrsStr)
+			value, exists := preOtherAttrs.AttrsMap["data-cc"]
+			if exists {
+				maxHeight = value
+			}
+		}
 		windowsStyle := `<div class="outer yosemite"><div class="dot red"></div><div class="dot amber"></div><div class="dot green"></div></div>`
 		replace := `<div class="code-toolbar"><pre data-lang="` + languageStr + `" data-line="` + lineHighlightStr + `" ` + preOtherAttrsStr + ` class="language-` + languageStr +
-			` line-numbers"><code class="language-` + languageStr + `">`
+			` line-numbers" style="max-height: ` + maxHeight + `"><code class="language-` + languageStr + `">`
 		_, _ = w.WriteString(windowsStyle + "\n" + replace)
 		r.writeLinesWithMarkTag(w, source, n)
 	} else {

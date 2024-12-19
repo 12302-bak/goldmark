@@ -266,7 +266,12 @@ type FencedCodeBlock struct {
 
 	lineHighlight []byte
 
-	preOtherAttrs []byte
+	preOtherAttrs *PreOtherAttrs
+}
+
+type PreOtherAttrs struct {
+	AttrsStr []byte
+	AttrsMap map[string]string
 }
 
 // Language returns an language in an info string.
@@ -310,8 +315,9 @@ func (n *FencedCodeBlock) LineHighlight(source []byte) []byte {
 }
 
 // PreOtherAttrs returns nil if this node does not have an info string.
-func (n *FencedCodeBlock) PreOtherAttrs(source []byte) []byte {
-	if n.preOtherAttrs == nil && n.Info != nil {
+func (n *FencedCodeBlock) PreOtherAttrs(source []byte) PreOtherAttrs {
+	n.preOtherAttrs = &PreOtherAttrs{}
+	if n.Info != nil {
 		segment := n.Info.Segment
 		info := segment.Value(source)
 		i := 0
@@ -326,13 +332,15 @@ func (n *FencedCodeBlock) PreOtherAttrs(source []byte) []byte {
 			}
 		}
 		if end > start {
-			n.preOtherAttrs = splitPreAttr(string(info[start+1 : end]))
+			attr, m := splitPreAttr(string(info[start+1 : end]))
+			n.preOtherAttrs.AttrsStr = attr
+			n.preOtherAttrs.AttrsMap = m
 		}
 	}
-	return n.preOtherAttrs
+	return *n.preOtherAttrs
 }
 
-func splitPreAttr(segment string) []byte {
+func splitPreAttr(segment string) ([]byte, map[string]string) {
 	pairs := strings.Split(segment, ",")
 
 	result := make(map[string]string)
@@ -350,7 +358,7 @@ func splitPreAttr(segment string) []byte {
 		output = append(output, fmt.Sprintf(`%s="%s"`, key, value))
 	}
 
-	return []byte(strings.Join(output, " "))
+	return []byte(strings.Join(output, " ")), result
 }
 
 // IsRaw implements Node.IsRaw.
