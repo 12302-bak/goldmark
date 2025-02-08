@@ -861,6 +861,15 @@ func (r *Renderer) renderText(w util.BufWriter, source []byte, node ast.Node, en
 			return ast.WalkContinue, nil
 		}
 
+		nextSibling := node.NextSibling()
+		if colonSuffix, ok := nextSibling.(*ast.Text); strings.HasSuffix(valueStr, "__") && ok {
+			if string(colonSuffix.Text(source)) == "colon__" {
+				r.Writer.Write(w, append(value[:len(value)-2], byte(':')))
+				node.RemoveChild(node.Parent(), nextSibling)
+				return ast.WalkContinue, nil
+			}
+		}
+
 		r.Writer.Write(w, value)
 		if n.HardLineBreak() || (n.SoftLineBreak() && r.HardWraps) {
 			if r.XHTML {
